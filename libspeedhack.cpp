@@ -8,6 +8,7 @@
 #include <cassert>
 #include <unistd.h>
 #include <fcntl.h>
+#include <clocale>
 
 using namespace std;
 
@@ -142,19 +143,30 @@ static int (*clock_gettime_orig)(clockid_t clk_id, timespec *tp);
 static double speedup = 1;
 static int fd;
 
+FILE *efile;
+
 static void fix_timescale() {
-	if (fd < 0) {
-		return;
-	}
-	static char s[16];
-	int n = read(fd, s, sizeof(s) - 1);
-	if (n <= 0) {
-		return;
-	}
-	s[n] = 0;
 	double news;
-	if (sscanf(s, "%lf", &news) < 1) {
-		return;
+	{
+		if (fd < 0) {
+			return;
+		}
+		static char s[16];
+		int n = read(fd, s, sizeof(s) - 1);
+		if (n <= 0) {
+			return;
+		}
+		s[n] = 0;
+		{ // Set locale to "C"? read, then restore locale
+			const char *lc = setlocale(LC_NUMERIC, "C");
+			int r = sscanf(s, "%lf", &news);
+			setlocale(LC_NUMERIC, lc);
+			if (r < 1) {
+				return;
+			}
+		}
+		fprintf(efile, "new timescale %lf\n", news);
+		fflush(efile);
 	}
 	
 	if (gettimeofday_orig) {
@@ -197,6 +209,7 @@ extern "C" void init_libspeedhack()
 {
 	gettimeofday_orig = decltype(gettimeofday_orig)(dlsym(RTLD_NEXT,"gettimeofday"));
 	clock_gettime_orig = decltype(clock_gettime_orig)(dlsym(RTLD_NEXT,"clock_gettime"));
+	efile = fopen("/tmp/speedhack_log", "a");
 	fd = open("/tmp/speedhack_pipe", O_RDONLY | O_NONBLOCK);
 	fix_timescale();
 }
@@ -247,7 +260,15 @@ extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 		_z = _threadzero;
 		break; 
 	default:
-		assert(0);
+		{
+			static bool f = true;
+			if (f) {
+				fprintf(efile, "LibSpeedhack: clock_gettime bad clk_id %d\n", clk_id);
+			fflush(efile);
+				f = false;
+			}
+		}
+		return clock_gettime_orig(clk_id, tp);
 	}
 	int val = clock_gettime_orig(clk_id, tp);
 	*tp = _z + (*tp - z) * speedup;
@@ -256,12 +277,24 @@ extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 
 extern "C" int settimeofday(const timeval *tv, const struct timezone *tz)
 {
-	assert(0);
+	static bool f = true;
+	if (f) {
+		fprintf(efile, "LibSpeedhack: settimeofday called\n");
+		fflush(efile);
+		f = false;
+	}
+	return 0;
 }
 
 extern "C" int clock_settime(clockid_t clk_id, const timespec *tp)
 {
-	assert(0);
+	static bool f = true;
+	if (f) {
+		fprintf(efile, "LibSpeedhack: clock_settime called\n");
+		fflush(efile);
+		f = false;
+	}
+	return 0;
 }
 
 

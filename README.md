@@ -3,6 +3,10 @@ libSPEEDHACK
 
 ### A simple dynamic library to slowdown or speedup games on Linux
 
+https://github.com/evg-zhabotinsky/libspeedhack
+
+https://github.com/evg-zhabotinsky/libspeedhack/releases/
+
 The main purpose of this rather simple library is to change speed at which
 games run, for example, to make fights easier by slowing everything down and
 giving yourself more time to react, or to get from point A to point B faster

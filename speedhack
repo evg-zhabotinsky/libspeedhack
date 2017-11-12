@@ -2,6 +2,8 @@
 
 # Create pipe for speed control commands
 mkfifo /tmp/speedhack_pipe
+# Remove old log
+rm -f /tmp/speedhack_log
 
 _libdir=$(cd $(dirname "$0"); echo $PWD)  # Directory where this script resides
 # Fix line below if you put libs in different location
