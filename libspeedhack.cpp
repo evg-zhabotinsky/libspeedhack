@@ -151,7 +151,7 @@ static void fix_timescale() {
 		if (fd < 0) {
 			return;
 		}
-		static char s[16];
+		char s[32];
 		int n = read(fd, s, sizeof(s) - 1);
 		if (n <= 0) {
 			return;
@@ -273,6 +273,16 @@ extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 	int val = clock_gettime_orig(clk_id, tp);
 	*tp = _z + (*tp - z) * speedup;
 	return val;
+}
+
+extern "C" time_t time(time_t *tloc)
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	if (tloc) {
+		*tloc = tv.tv_sec;
+	}
+	return tv.tv_sec;
 }
 
 extern "C" int settimeofday(const timeval *tv, const struct timezone *tz)
