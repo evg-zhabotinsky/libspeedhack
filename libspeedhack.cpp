@@ -205,8 +205,13 @@ static void fix_timescale() {
 	speedup = news;
 }
 
+static bool inited = false;
 extern "C" void init_libspeedhack()
 {
+	if (inited) {
+		return;
+	}
+	inited = true;
 	gettimeofday_orig = decltype(gettimeofday_orig)(dlsym(RTLD_NEXT,"gettimeofday"));
 	clock_gettime_orig = decltype(clock_gettime_orig)(dlsym(RTLD_NEXT,"clock_gettime"));
 	efile = fopen("/tmp/speedhack_log", "a");
@@ -216,6 +221,8 @@ extern "C" void init_libspeedhack()
 
 extern "C" int gettimeofday(timeval *tv, struct timezone *tz)
 {
+	if (!inited)
+		init_libspeedhack();
 	fix_timescale();
 	int val = gettimeofday_orig(tv, tz);
 	*tv = _timezero + (*tv - timezero) * speedup;
@@ -224,6 +231,8 @@ extern "C" int gettimeofday(timeval *tv, struct timezone *tz)
 
 extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 {
+	if (!inited)
+		init_libspeedhack();
 	fix_timescale();
 	timespec z, _z;
 	switch (clk_id) {
