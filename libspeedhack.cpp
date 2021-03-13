@@ -137,7 +137,7 @@ static timespec
 	_monotoniczero, _monotoniccoarsezero, _monotonicrawzero,
 	_boottimezero, _processzero, _threadzero;
 
-static int (*gettimeofday_orig)(timeval *tv, struct timezone *tz);
+static int (*gettimeofday_orig)(timeval *tv, void *tz);
 static int (*clock_gettime_orig)(clockid_t clk_id, timespec *tp);
 
 static double speedup = 1;
@@ -219,7 +219,7 @@ extern "C" void init_libspeedhack()
 	fix_timescale();
 }
 
-extern "C" int gettimeofday(timeval *tv, struct timezone *tz)
+extern "C" int gettimeofday(timeval *tv, void *tz)
 {
 	if (!inited)
 		init_libspeedhack();
