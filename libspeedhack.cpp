@@ -168,7 +168,7 @@ static void fix_timescale() {
 		fprintf(efile, "new timescale %lf\n", news);
 		fflush(efile);
 	}
-	
+
 	if (gettimeofday_orig) {
 		timeval tv;
 		gettimeofday_orig(&tv, nullptr);
@@ -239,35 +239,35 @@ extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 	case CLOCK_REALTIME:
 		z = realtimezero;
 		_z = _realtimezero;
-		break; 
+		break;
 	case CLOCK_REALTIME_COARSE:
 		z = realtimecoarsezero;
 		_z = _realtimecoarsezero;
-		break; 
+		break;
 	case CLOCK_MONOTONIC:
 		z = monotoniczero;
 		_z = _monotoniczero;
-		break; 
+		break;
 	case CLOCK_MONOTONIC_COARSE:
 		z = monotoniccoarsezero;
 		_z = _monotoniccoarsezero;
-		break; 
+		break;
 	case CLOCK_MONOTONIC_RAW:
 		z = monotonicrawzero;
 		_z = _monotonicrawzero;
-		break; 
+		break;
 	case CLOCK_BOOTTIME:
 		z = boottimezero;
 		_z = _boottimezero;
-		break; 
+		break;
 	case CLOCK_PROCESS_CPUTIME_ID:
 		z = processzero;
 		_z = _processzero;
-		break; 
+		break;
 	case CLOCK_THREAD_CPUTIME_ID:
 		z = threadzero;
 		_z = _threadzero;
-		break; 
+		break;
 	default:
 		{
 			static bool f = true;
@@ -315,5 +315,3 @@ extern "C" int clock_settime(clockid_t clk_id, const timespec *tp)
 	}
 	return 0;
 }
-
-
