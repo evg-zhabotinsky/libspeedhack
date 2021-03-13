@@ -3,9 +3,8 @@ libSPEEDHACK
 
 ### A simple dynamic library to slowdown or speedup games on Linux
 
-https://github.com/evg-zhabotinsky/libspeedhack
-
-https://github.com/evg-zhabotinsky/libspeedhack/releases/
+<https://github.com/evg-zhabotinsky/libspeedhack>  
+<https://github.com/evg-zhabotinsky/libspeedhack/releases/>
 
 The main purpose of this rather simple library is to change speed at which
 games run, for example, to make fights easier by slowing everything down and
@@ -17,6 +16,52 @@ I have written this to make Undertale less impossible for me to win. :smile:
 
 It might have other uses, but I can't think of any just yet.
 Apart from faking benchmark scores, of course. :smile:
+
+
+### Caveats
+
+Due to how this hack library works, it needs to intercept
+*every single time-getting function* that the game in question uses
+to properly adjust time seen by the game.  
+*Unfortunately*, there are *tons* of such functions,
+so this library intercepts only those I found
+and will need updates to work with some games.  
+*Moreover*, it is possible to get system time
+without calling any library function by directly using a syscall,
+and in such cases this library's approach cannot work at all.
+
+All that means that the library will work well for some games (e.g. Undertale),
+but for others it will cause glitches (like occasional crashes or hangs)
+due to not intercepting some of the functions that game uses.
+(For example, in Falf-Life:Source slowing time
+ for more than a few minutes usually makes it hang and require force-close.)
+And in some games, it will not work at all,
+plus for some of them this is impossible to fix.
+
+Having said that, there is a "compatibility list" at
+<https://github.com/evg-zhabotinsky/libspeedhack/wiki>.
+If you try a game not listed there, feel free to add it if you have time.
+
+One more note: games handle time differently.  
+If you make a game think that time passes 100 times faster,
+it will also thing your computer is 100 times slower,
+i.e. a 30MHz piece-of-crap CPU with 0.6 FPS screen update rate,
+so it might "lag as hell", resulting in net speedup of only 5x or so.  
+And if you make it think that time goes 100 times slower,
+it might still assume something like "VSync is around 60Hz"
+and base its timings off that, resulting in little or no slowdown.  
+Usually, speed multipliers between 0.01 and 10 work fine. YMMV
+
+This library can only be used with *one process at a time*,
+due to how it is controlled, otherwise each command is received
+only by a single randomly chosen process.  
+*Beware!* Many games are launched through some sort of "launcher".
+*If, for whatever reason, it gets time while the game is running,
+ that violates the above restriction and it will swallow commands at random!*
+Shell scripts are usually ok, but anything with GUI is suspect.
+For example, you can't run whole Steam with libspeedhack,
+you have to change launch options for the specific game.
+
 
 ### How to build
 
@@ -36,7 +81,7 @@ Run `make clean` to remove built libraries.
 
 ### How to use
 
-If you simply ran `make` and didn't do anything fancy, this should work:
+If you simply ran make and didn't do anything fancy, this should work:
 
     libspeedhack_directory/speedhack path/to/executable [args]
 
@@ -49,18 +94,16 @@ To control speed, write floating point speedup multiplier into
 
     echo 0.5 >/tmp/speedhack_pipe  # 2x slowdown
 
-_Try to keep numbers short, or things might break._
-
 To make it more practical, bind those `echo`s to keyboard shortcuts.
 (Those are likely somewhere like _control panel > keyboard > shortcuts_)
 Like `Win + 890-=` for multipliers .25, .5, 1, 2 and 4.
 
-All this should work with Steam games too, if you wonder. Just open
-launch options from game properties and put this there:
+All this should work with Steam games too, if you wonder.
+Just open launch options from game properties and put this there:
 
     $HOME/libspeedhack/speedhack %command%
 
-Don't forget to substiture real path to `speedhack`.
+Don't forget to substiture real path to `speedhack` script.
 
 
 ### How it works
@@ -82,7 +125,8 @@ Controlling how slow or fast things are is done by writing floating point
 multiplier into control fifo, which is currently hardcoded to
 `/tmp/speedhack_pipe`. It's kinda ugly but works.
 
-Wrapper script `speedhack` just creates control pipe if it does not exist yet
-and fills in LD_LIBRARY_PATH and LD_PRELOAD for library to work. Library
-directories `lib32` and `lib64` must reside in the same directory as wrapper
-script for it to be used as is.
+Wrapper script `speedhack` just recreates control pipe
+and fills in LD_LIBRARY_PATH and LD_PRELOAD for library to work.
+Library directories `lib` and/or `lib32` and `lib64` must reside in the same
+directory as wrapper script for it to be used without modifications.
+
