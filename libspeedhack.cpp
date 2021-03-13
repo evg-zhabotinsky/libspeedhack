@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <clocale>
 #include <cstring>
+#include <mutex>
 
 using namespace std;
 
@@ -137,10 +138,10 @@ static timeval timezero, _timezero;
 static timespec
 	realtimezero, realtimecoarsezero,
 	monotoniczero, monotoniccoarsezero, monotonicrawzero,
-	boottimezero, processzero, threadzero,
+	boottimezero,
 	_realtimezero, _realtimecoarsezero,
 	_monotoniczero, _monotoniccoarsezero, _monotonicrawzero,
-	_boottimezero, _processzero, _threadzero;
+	_boottimezero;
 
 static int (*gettimeofday_orig)(timeval *tv, void *tz);
 static int (*clock_gettime_orig)(clockid_t clk_id, timespec *tp);
@@ -187,12 +188,14 @@ static void fix_timescale() {
 					}
 					dbglog("flush: remainder %d: %.*s\n", str_len, str_len, str);
 					n = read(fd, str + str_len, buf_len - str_len);
-					if (n < 0) {
-						dbglog("read error %d\n", n);
+					if (n < 0 && errno != EAGAIN) {
+						dbglog("read error %d: %s\n", errno, strerror(errno));
 						str_len = -1;
 						return;
 					}
-					str_len += n;
+					if (n > 0) {
+						str_len += n;
+					}
 					break;
 				}
 				if (n < buf_len) {
@@ -210,12 +213,12 @@ static void fix_timescale() {
 				dbglog("was %d: %.*s\n", str_len, str_len, str);
 			}
 #endif
-			if (n < 0) {
-				dbglog("read error %d\n", n);
+			if (n < 0 && errno != EAGAIN) {
+				dbglog("read error %d: %s\n", errno, strerror(errno));
 				str_len = -1;
 				return;
 			}
-			if (n == 0) {
+			if (n <= 0) {
 #ifdef DEBUG
 				if (tp == nullptr) {
 					dbglog("nothing read\n");
@@ -304,23 +307,18 @@ static void fix_timescale() {
 		clock_gettime_orig(CLOCK_BOOTTIME, &tv);
 		_boottimezero += (tv - boottimezero) * speedup;
 		boottimezero = tv;
-		clock_gettime_orig(CLOCK_PROCESS_CPUTIME_ID, &tv);
-		_processzero += (tv - processzero) * speedup;
-		processzero = tv;
-		clock_gettime_orig(CLOCK_THREAD_CPUTIME_ID, &tv);
-		_threadzero += (tv - threadzero) * speedup;
-		threadzero = tv;
 	}
 	speedup = news;
 }
 
-static bool inited = false;
-extern "C" void init_libspeedhack()
+static mutex *the_mutex;
+
+static void init_libspeedhack()
 {
-	if (inited) {
+	if (the_mutex != nullptr) {
 		return;
 	}
-	inited = true;
+	the_mutex = new mutex;
 	gettimeofday_orig = decltype(gettimeofday_orig)(dlsym(RTLD_NEXT,"gettimeofday"));
 	clock_gettime_orig = decltype(clock_gettime_orig)(dlsym(RTLD_NEXT,"clock_gettime"));
 	efile = fopen("/tmp/speedhack_log", "a");
@@ -328,11 +326,24 @@ extern "C" void init_libspeedhack()
 	fix_timescale();
 }
 
+// Constructor of this runs somewhere during process init
+static struct Init {
+	Init() {
+		init_libspeedhack();
+	}
+} init_struct;
+
+// Put at the start of every externally called function that messes with time
+#define LOCKED_TS                        \
+	if (the_mutex == nullptr) {          \
+		init_libspeedhack();             \
+	}                                    \
+	lock_guard<mutex> _lock(*the_mutex); \
+	fix_timescale();
+
 extern "C" int gettimeofday(timeval *tv, void *tz)
 {
-	if (!inited)
-		init_libspeedhack();
-	fix_timescale();
+	LOCKED_TS
 	int val = gettimeofday_orig(tv, tz);
 	*tv = _timezero + (*tv - timezero) * speedup;
 	return val;
@@ -340,9 +351,7 @@ extern "C" int gettimeofday(timeval *tv, void *tz)
 
 extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 {
-	if (!inited)
-		init_libspeedhack();
-	fix_timescale();
+	LOCKED_TS
 	timespec z, _z;
 	switch (clk_id) {
 	case CLOCK_REALTIME:
@@ -370,13 +379,8 @@ extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 		_z = _boottimezero;
 		break;
 	case CLOCK_PROCESS_CPUTIME_ID:
-		z = processzero;
-		_z = _processzero;
-		break;
 	case CLOCK_THREAD_CPUTIME_ID:
-		z = threadzero;
-		_z = _threadzero;
-		break;
+		return clock_gettime_orig(clk_id, tp);
 	default:
 		{
 			static bool f = true;

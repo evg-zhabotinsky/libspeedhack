@@ -17,7 +17,7 @@ native: lib/libspeedhack.so
 
 %/libspeedhack.so: libspeedhack.cpp
 	mkdir -p $(@D)
-	g++ -std=gnu++14 -Wall $(EXTRAFLAGS) $(ARCHFLAGS) -fPIC -shared -Wl,-init=init_libspeedhack $< -ldl -o $@
+	g++ -std=c++11 -Wall $(EXTRAFLAGS) $(ARCHFLAGS) -fPIC -shared $< -ldl -o $@
 
 clean:
 	rm -rf lib lib64 lib32
