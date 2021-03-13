@@ -20,8 +20,18 @@ Apart from faking benchmark scores, of course. :smile:
 
 ### How to build
 
-Just run `make`. Or run `make 32bit` and/or `make 64bit`.
-Read the Makefile if curious.
+To build for your system's native architecture, run `make` or `make native`.  
+On Debian and derivatives, you will need `build-essential` installed
+(`sudo apt-get install build-essential`) for that to work.
+
+On a multilib system, like most modern x86-64 installations,
+some games may be using secondary architecture, like i386.  
+To build both 32-bit and 64-bit libraries, run `make multilib`,
+or separately `make 64bit` and/or `make 32bit`.  
+On Debian and derivatives, you will also need `g++-multilib` installed
+to build for the secondary architecture.
+
+Run `make clean` to remove built libraries.
 
 
 ### How to use

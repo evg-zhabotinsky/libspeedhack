@@ -7,7 +7,7 @@ mkfifo /tmp/speedhack_pipe
 
 _libdir=$(cd $(dirname "$0"); echo $PWD)  # Directory where this script resides
 # Fix line below if you put libs in different location
-LD_LIBRARY_PATH="$_libdir/lib32:$_libdir/lib64:$LD_LIBRARY_PATH" \
-LD_PRELOAD="libspeedhack.so:$LD_PRELOAD" \
+LD_LIBRARY_PATH="${_libdir}/lib:${_libdir}/lib64:${_libdir}/lib32${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+LD_PRELOAD="libspeedhack.so${LD_PRELOAD:+:$LD_PRELOAD}" \
 exec "$@"
 
