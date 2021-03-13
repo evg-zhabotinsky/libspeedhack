@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <clocale>
+#include <cstring>
 
 using namespace std;
 
@@ -51,10 +52,12 @@ static timeval operator * (const timeval &tv, double x)
 	return res;
 }
 
+/* Unused
 static timeval operator * (double x, const timeval &tv)
 {
 	return tv * x;
 }
+*/
 
 static timeval operator + (const timeval &tv, const timeval &x)
 {
@@ -109,10 +112,12 @@ static timespec operator * (const timespec &tv, double x)
 	return res;
 }
 
+/* Unused
 static timespec operator * (double x, const timespec &tv)
 {
 	return tv * x;
 }
+*/
 
 static timespec operator + (const timespec &tv, const timespec &x)
 {
@@ -142,33 +147,137 @@ static int (*clock_gettime_orig)(clockid_t clk_id, timespec *tp);
 
 static double speedup = 1;
 static int fd;
+static constexpr int buf_len = 32;
+static char str[buf_len];
+static int str_len;
 
 FILE *efile;
+#define log(...) do {            \
+	fprintf(efile, "LibSpeedhack: " __VA_ARGS__); \
+	fflush(efile);               \
+} while (0)
+#ifdef DEBUG
+#define dbglog(...) log("Debug: " __VA_ARGS__)
+#else
+#define dbglog(...) do {} while(0)
+#endif
 
 static void fix_timescale() {
 	double news;
-	{
+	{  // Read new timescale value, if any, else return
 		if (fd < 0) {
 			return;
 		}
-		char s[32];
-		int n = read(fd, s, sizeof(s) - 1);
-		if (n <= 0) {
-			return;
-		}
-		s[n] = 0;
-		{ // Set locale to "C"? read, then restore locale
-			const char *lc = setlocale(LC_NUMERIC, "C");
-			int r = sscanf(s, "%lf", &news);
-			setlocale(LC_NUMERIC, lc);
-			if (r < 1) {
+		if (str_len < 0) {  // Error indicator, flush until newline
+			dbglog("flushing after error\n");
+			for (;;) {
+				int n = read(fd, str, buf_len);
+				if (n <= 0) {
+					dbglog("flush: no more data or error %d\n", n);
+					return;
+				}
+				dbglog("flush: read %d: %.*s\n", n, n, str);
+				char *p = (char*)memchr(str, '\n', n);
+				if (p != nullptr) {
+					dbglog("flush: found newline\n");
+					p++;
+					str_len = str + n - p;
+					if (str_len > 0) {
+						memmove(str, p, str_len);
+					}
+					dbglog("flush: remainder %d: %.*s\n", str_len, str_len, str);
+					n = read(fd, str + str_len, buf_len - str_len);
+					if (n < 0) {
+						dbglog("read error %d\n", n);
+						str_len = -1;
+						return;
+					}
+					str_len += n;
+					break;
+				}
+				if (n < buf_len) {
+					dbglog("flush: not full buffer and no newline\n");
+					return;
+				}
+			}
+		} else {
+			// Read more until newline, return if none yet
+			int n = read(fd, str + str_len, buf_len - str_len);
+#ifdef DEBUG
+			static const char ticker[] = "-\\|/";
+			static const char* tp = nullptr;
+			if (n > 0 || tp == nullptr) {
+				dbglog("was %d: %.*s\n", str_len, str_len, str);
+			}
+#endif
+			if (n < 0) {
+				dbglog("read error %d\n", n);
+				str_len = -1;
 				return;
 			}
+			if (n == 0) {
+#ifdef DEBUG
+				if (tp == nullptr) {
+					dbglog("nothing read\n");
+					tp = ticker;
+				} else {
+					dbglog("%c\r", *tp);
+					if (*++tp == 0) {
+						tp = ticker;
+					}
+				}
+#endif
+				return;
+			}
+			str_len += n;
 		}
-		fprintf(efile, "new timescale %lf\n", news);
-		fflush(efile);
+		dbglog("now %d: %.*s\n", str_len, str_len, str);
+		char *end = (char*)memrchr(str, '\n', str_len);
+		if (end == nullptr) {
+			if (str_len < buf_len) {
+				dbglog("no newline yet\n");
+				return;
+			}
+			// Maximum line length reached, parse anyway
+			dbglog("max line length\n");
+			end = str + str_len - 1;
+			str_len = -1;  // Flush the remainder of the line
+		} else {
+			str_len -= end + 1 - str;
+		}
+		// Found last line end, isolate the line
+		char *start = (char*)memrchr(str, '\n', end - str);
+		if (start == nullptr) {
+			start = str;
+		} else {
+			start++;
+		}
+		*end = 0;
+		dbglog("line %d: %s\n", int(end-start), start);
+		// Read the first floating point number in that line
+		{ // Set locale to "C" to use decimal dot, parse, then restore locale
+			const char *lc = setlocale(LC_NUMERIC, "C");
+			int r = sscanf(start, "%lf", &news);
+			setlocale(LC_NUMERIC, lc);
+			if (r < 1) {
+				news = -1;  // No float parsed, so setting to invalid
+			}
+		}
+		dbglog("read as %lf\n", news);
+		// Move the remainder of the string to the start
+		if (str_len > 0) {
+			memmove(str, end + 1, str_len);
+		}
+		// Log read timescale value to log
+		dbglog("remainder %d: %.*s\n", str_len, str_len, str);
+		if (news <= 0) {
+			log("invalid input\n");
+			return;
+		}
+		log("new timescale %lf\n", news);
 	}
 
+	// Apply the new timescale
 	if (gettimeofday_orig) {
 		timeval tv;
 		gettimeofday_orig(&tv, nullptr);
@@ -272,8 +381,7 @@ extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 		{
 			static bool f = true;
 			if (f) {
-				fprintf(efile, "LibSpeedhack: clock_gettime bad clk_id %d\n", clk_id);
-			fflush(efile);
+				log("clock_gettime bad clk_id %d\n", clk_id);
 				f = false;
 			}
 		}
@@ -298,8 +406,7 @@ extern "C" int settimeofday(const timeval *tv, const struct timezone *tz)
 {
 	static bool f = true;
 	if (f) {
-		fprintf(efile, "LibSpeedhack: settimeofday called\n");
-		fflush(efile);
+		log("settimeofday called\n");
 		f = false;
 	}
 	return 0;
@@ -309,8 +416,7 @@ extern "C" int clock_settime(clockid_t clk_id, const timespec *tp)
 {
 	static bool f = true;
 	if (f) {
-		fprintf(efile, "LibSpeedhack: clock_settime called\n");
-		fflush(efile);
+		log("clock_settime called\n");
 		f = false;
 	}
 	return 0;

@@ -1,3 +1,7 @@
+ifeq ($(DEBUG),y)
+EXTRAFLAGS += -DDEBUG
+endif
+
 .PHONY: clean native multilib 32bit 64bit
 
 .DEFAULT_GOAL = native
@@ -13,7 +17,7 @@ native: lib/libspeedhack.so
 
 %/libspeedhack.so: libspeedhack.cpp
 	mkdir -p $(@D)
-	g++ -std=gnu++14 -Wall $(ARCHFLAGS) -fPIC -shared -Wl,-init=init_libspeedhack $< -ldl -o $@
+	g++ -std=gnu++14 -Wall $(EXTRAFLAGS) $(ARCHFLAGS) -fPIC -shared -Wl,-init=init_libspeedhack $< -ldl -o $@
 
 clean:
 	rm -rf lib lib64 lib32

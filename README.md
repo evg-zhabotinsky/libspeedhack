@@ -80,8 +80,7 @@ using `LD_PRELOAD`, like this:
 
 Controlling how slow or fast things are is done by writing floating point
 multiplier into control fifo, which is currently hardcoded to
-`/tmp/speedhack_pipe`. It's kinda ugly as of now, use numbers as short as
-possible or else things might break. Or just fix how the lib reads them.
+`/tmp/speedhack_pipe`. It's kinda ugly but works.
 
 Wrapper script `speedhack` just creates control pipe if it does not exist yet
 and fills in LD_LIBRARY_PATH and LD_PRELOAD for library to work. Library
