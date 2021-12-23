@@ -5,6 +5,7 @@ libSPEEDHACK
 
 <https://github.com/evg-zhabotinsky/libspeedhack>  
 <https://github.com/evg-zhabotinsky/libspeedhack/releases/>
+<https://aur.archlinux.org/packages/libspeedhack-git/>
 
 The main purpose of this rather simple library is to change the speed at which
 games run, for example, to make fights easier by slowing everything down and
