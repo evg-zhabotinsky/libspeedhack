@@ -14,6 +14,15 @@
 
 using namespace std;
 
+// Template magic to avoid "conflicting declaration" for `gettimeofday` due to deprecated parameter `tz` type changes
+template<typename F> struct TzTypeHelper;
+template<typename TV, typename TZ> struct TzTypeHelper<int(TV, TZ)> { using type = TZ; };
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+using TzTypeGet = TzTypeHelper<decltype(gettimeofday)>::type;
+using TzTypeSet = TzTypeHelper<decltype(settimeofday)>::type;
+#pragma GCC diagnostic pop
+
 static timeval& operator *= (timeval &tv, double x)
 {
 	double sec = tv.tv_sec * x, usec = tv.tv_usec * x;
@@ -143,7 +152,7 @@ static timespec
 	_monotoniczero, _monotoniccoarsezero, _monotonicrawzero,
 	_boottimezero;
 
-static int (*gettimeofday_orig)(timeval *tv, void *tz);
+static int (*gettimeofday_orig)(timeval *tv, TzTypeGet tz);
 static int (*clock_gettime_orig)(clockid_t clk_id, timespec *tp);
 
 static double speedup = 1;
@@ -341,7 +350,7 @@ static struct Init {
 	lock_guard<mutex> _lock(*the_mutex); \
 	fix_timescale();
 
-extern "C" int gettimeofday(timeval *tv, void *tz)
+extern "C" int gettimeofday(timeval *tv, TzTypeGet tz)
 {
 	LOCKED_TS
 	int val = gettimeofday_orig(tv, tz);
@@ -399,14 +408,14 @@ extern "C" int clock_gettime(clockid_t clk_id, timespec *tp)
 extern "C" time_t time(time_t *tloc)
 {
 	struct timeval tv;
-	gettimeofday(&tv, NULL);
+	gettimeofday(&tv, nullptr);
 	if (tloc) {
 		*tloc = tv.tv_sec;
 	}
 	return tv.tv_sec;
 }
 
-extern "C" int settimeofday(const timeval *tv, const struct timezone *tz)
+extern "C" int settimeofday(const timeval *tv, TzTypeSet tz)
 {
 	static bool f = true;
 	if (f) {
