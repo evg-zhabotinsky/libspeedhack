@@ -3,8 +3,13 @@ libSPEEDHACK
 
 ### A simple dynamic library to slowdown or speedup games on Linux
 
-<https://github.com/evg-zhabotinsky/libspeedhack>  
+Source code:  
+<https://github.com/evg-zhabotinsky/libspeedhack>
+
+**Download binaries ready for use** (should work in most cases) **here:**  
 <https://github.com/evg-zhabotinsky/libspeedhack/releases/>
+
+AUR package:  
 <https://aur.archlinux.org/packages/libspeedhack-git/>
 
 The main purpose of this rather simple library is to change the speed at which
@@ -65,6 +70,11 @@ you have to change launch options for the specific game.
 
 
 ### How to build
+
+**1. Don't!**  
+Not before checking if there is a prebuilt release that works on your system!  
+<https://github.com/evg-zhabotinsky/libspeedhack/releases/>  
+Failing that, read on to build it yourself.
 
 To build for your system's native architecture, run `make` or `make native`.  
 On Debian and derivatives, you will need `build-essential` installed
